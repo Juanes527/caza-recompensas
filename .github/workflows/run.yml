@@ -1,0 +1,69 @@
+name: run bot
+
+on:
+  schedule:
+    # Every 30 minutes. The repository is public, so Actions minutes are not limited.
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+# Two overlapping runs would read the same posts: the next one waits.
+concurrency:
+  group: run-bot
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    # Off until the repository variable BOT_ENABLED is "true" (Settings → Secrets and variables → Actions).
+    if: vars.BOT_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Cache the browser
+        id: browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install the browser
+        run: npx playwright install --with-deps chromium
+        if: steps.browser.outputs.cache-hit != 'true'
+
+      - name: Install the browser's system libraries
+        run: npx playwright install-deps chromium
+        if: steps.browser.outputs.cache-hit == 'true'
+
+      # The posts already decided survive between runs in the Actions cache until the bot gets
+      # its Supabase table. A new key each run, restored from the latest one.
+      - name: Restore seen posts
+        id: seen
+        uses: actions/cache/restore@v4
+        with:
+          path: seen-posts.json
+          key: seen-posts-${{ github.run_id }}
+          restore-keys: seen-posts-
+
+      - name: Run
+        run: npm start
+        env:
+          TARGET_URL: ${{ vars.TARGET_URL }}
+          BOT_INGEST_SECRET: ${{ secrets.BOT_INGEST_SECRET }}
+
+      - name: Save seen posts
+        if: always() && hashFiles('seen-posts.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: seen-posts.json
+          key: seen-posts-${{ github.run_id }}

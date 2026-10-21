@@ -1,0 +1,7 @@
+node_modules/
+.env*
+!.env.example
+*.log
+seen-posts.json
+.local-test.json
+.local-seen*.json

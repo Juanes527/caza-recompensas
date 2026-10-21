@@ -1,0 +1,21 @@
+{
+  "name": "caza-recompensas",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "dry-run": "node src/dry-run.ts",
+    "start": "node src/main.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm run test"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "playwright": "^1.64.1",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  }
+}
