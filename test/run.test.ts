@@ -166,37 +166,86 @@ describe("selectOffers", () => {
     expect(selected.map((o) => o.sourceId)).toEqual(["2", "1"]);
   });
 
-  it("keeps the newest few when there are more, and sends them oldest first", () => {
-    const offers = [post(1, 50), post(2, 40), post(3, 30), post(4, 20), post(5, 10)];
-    const selected = selectOffers(offers, { seen: seenFile(), now: NOW, limit: 3 });
-    expect(selected.map((o) => o.sourceId)).toEqual(["3", "4", "5"]);
+  it("has no cap: every recent unseen post is selected, oldest first", () => {
+    const offers = Array.from({ length: 40 }, (_, i) => post(i + 1, 100 - i));
+    const selected = selectOffers(offers, { seen: seenFile(), now: NOW, maxAgeMs: 120 * 60_000 });
+    expect(selected).toHaveLength(40);
+    expect(selected[0]?.sourceId).toBe("1");
   });
 
-  it("leaves out seen posts and deals that ended, before counting the limit", () => {
+  it("leaves out seen posts and deals that ended", () => {
     const seen = seenFile();
     seen.add(post(5, 1));
-    const offers = [
-      post(1, 50),
-      post(2, 40, { endAt: ago(1) }),
-      post(3, 30),
-      post(4, 20),
-      post(5, 1),
-    ];
-    const selected = selectOffers(offers, { seen, now: NOW, limit: 2 });
-    expect(selected.map((o) => o.sourceId)).toEqual(["3", "4"]);
+    const offers = [post(1, 50), post(2, 40, { endAt: ago(1) }), post(3, 30), post(5, 1)];
+    expect(selectOffers(offers, { seen, now: NOW }).map((o) => o.sourceId)).toEqual(["1", "3"]);
+  });
+});
+
+describe("the queue", () => {
+  const run = async (
+    answers: IngestOutcome[],
+    extra: Partial<Parameters<typeof runOnce>[0]> = {},
+  ) => {
+    const waits: number[] = [];
+    const offers = answers.map((_, i) => offer(i + 1));
+    const summary = await runOnce({
+      offers,
+      ingest: async (o) => answers[Number(o.sourceId) - 1]!,
+      seen: seenFile(),
+      now: () => NOW,
+      gapMs: 45_000,
+      politeMs: 3_000,
+      sleep: async (ms) => void waits.push(ms),
+      ...extra,
+    });
+    return { summary, waits };
+  };
+
+  it("waits 45 s after each published offer, a short pause after the others, and not after the last", async () => {
+    const published: IngestOutcome = { kind: "published", slug: "a" };
+    const { waits } = await run([
+      published,
+      published,
+      { kind: "duplicate", slug: "d" },
+      { kind: "rejected", reason: "no_images" },
+      published,
+    ]);
+    // offers are sent oldest first: 5, 4, 3, 2, 1
+    expect(waits).toEqual([45_000, 3_000, 3_000, 45_000]);
+  });
+
+  it("publishes as many as there are, with no limit", async () => {
+    const { summary } = await run(
+      Array.from({ length: 30 }, () => ({ kind: "published", slug: "a" }) as const),
+    );
+    expect(summary.published).toBe(30);
+  });
+
+  it("stops starting offers once the time budget is over, keeping the rest for the next run", async () => {
+    let clock = NOW.getTime();
+    const { summary } = await run(
+      Array.from({ length: 5 }, () => ({ kind: "published", slug: "a" }) as const),
+      {
+        now: () => new Date(clock),
+        sleep: async (ms) => void (clock += ms),
+        deadline: NOW.getTime() + 100_000,
+      },
+    );
+    // sends at t=0, 45 s, 90 s; at 135 s the budget (100 s) is over
+    expect(summary).toMatchObject({ published: 3, stopped: "budget" });
   });
 });
 
 describe("policyFromEnv", () => {
-  it("defaults to the last two hours and three posts per source, and accepts overrides", () => {
-    expect(policyFromEnv({})).toEqual({ maxAgeMs: 120 * 60_000, limit: 3 });
-    expect(policyFromEnv({ BOT_MAX_AGE_MINUTES: "30", BOT_MAX_PER_SOURCE: "1" })).toEqual({
+  it("defaults to the last two hours and 45 s between offers, and accepts overrides", () => {
+    expect(policyFromEnv({})).toEqual({ maxAgeMs: 120 * 60_000, gapMs: 45_000 });
+    expect(policyFromEnv({ BOT_MAX_AGE_MINUTES: "30", BOT_GAP_SECONDS: "60" })).toEqual({
       maxAgeMs: 30 * 60_000,
-      limit: 1,
+      gapMs: 60_000,
     });
-    expect(policyFromEnv({ BOT_MAX_AGE_MINUTES: "-5", BOT_MAX_PER_SOURCE: "x" })).toEqual({
+    expect(policyFromEnv({ BOT_MAX_AGE_MINUTES: "-5", BOT_GAP_SECONDS: "x" })).toEqual({
       maxAgeMs: 120 * 60_000,
-      limit: 3,
+      gapMs: 45_000,
     });
   });
 });

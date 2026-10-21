@@ -20,24 +20,25 @@ GitHub Actions (cada 30 min)
                          POST {TARGET_URL}/api/bot/ingest ◄───────────┘   (Authorization: Bearer BOT_INGEST_SECRET)
 ```
 
-| Respuesta del destino | Qué hace el bot                                            |
-| --------------------- | ---------------------------------------------------------- |
-| 201 publicada         | Recuerda el post                                           |
-| 409 duplicada         | Recuerda el post                                           |
-| 422 no publicable     | Recuerda el post (no se reintenta)                         |
-| 429 tope por hora     | Corta la corrida; el resto queda para la siguiente         |
-| 5xx / red             | Reintenta esa oferta en la próxima corrida                 |
-| 401 / 503             | Para y termina con error (secreto malo o endpoint apagado) |
+| Respuesta del destino  | Qué hace el bot                                            |
+| ---------------------- | ---------------------------------------------------------- |
+| 201 publicada          | Recuerda el post                                           |
+| 409 duplicada          | Recuerda el post                                           |
+| 422 no publicable      | Recuerda el post (no se reintenta)                         |
+| 429 límite del destino | Corta la corrida; el resto queda para la siguiente         |
+| 5xx / red              | Reintenta esa oferta en la próxima corrida                 |
+| 401 / 503              | Para y termina con error (secreto malo o endpoint apagado) |
 
 ## Qué publica
 
-El bot sigue a las comunidades, no copia sus páginas. En cada corrida, por fuente:
+El bot sigue a las comunidades, no copia sus páginas. **No hay tope de publicaciones**, pero sí una cola:
 
-1. Solo posts **recientes**: publicados hace menos de 120 minutos (`BOT_MAX_AGE_MINUTES`). Así, la primera corrida no sube la portada entera.
+1. Solo posts **recientes**: publicados hace menos de 120 minutos (`BOT_MAX_AGE_MINUTES`). Así la primera corrida no sube la portada entera.
 2. Se quitan los ya vistos y los que ya vencieron.
-3. Se toman los **3 más nuevos** (`BOT_MAX_PER_SOURCE`) y se envían del más antiguo al más nuevo.
+3. Las ofertas de **todas las fuentes** entran en una sola cola, ordenadas de la más antigua a la más nueva, y se publican **una cada 45 segundos** (`BOT_GAP_SECONDS`). Tras un duplicado o un rechazo solo se espera 3 s, porque no se publicó nada.
+4. Una corrida deja de empezar ofertas a los 25 minutos para terminar antes de la siguiente; lo que quede espera a la corrida siguiente mientras siga dentro de la ventana de 120 minutos.
 
-Con tres fuentes y una corrida cada 30 minutos son como máximo 9 ofertas por corrida (el destino además limita por hora). Los posts que no entran vuelven a competir en la corrida siguiente mientras sigan dentro de la ventana; los que envejecen, se pierden. `npm run dry-run` muestra exactamente qué se enviaría.
+Al ritmo de 45 s salen como máximo unas 80 ofertas por hora. `npm run dry-run` muestra exactamente qué se enviaría.
 
 ## Fuentes
 
@@ -50,15 +51,15 @@ Agregar una fuente es crear un archivo en `src/sources` que cumpla `Source` (ver
 
 ## Configuración
 
-| Nombre              | Dónde                     | Qué es                                                            |
-| ------------------- | ------------------------- | ----------------------------------------------------------------- |
-| `TARGET_URL`        | Variable de Actions / env | Origen del sitio de destino                                       |
-| `BOT_INGEST_SECRET` | Secreto de Actions / env  | Secreto compartido que abre el endpoint de ingesta (≥ 24 car.)    |
-| `BOT_ENABLED`       | Variable de Actions       | `true` enciende el workflow; sin ella no corre                    |
-| `STATE_FILE`        | env (opcional)            | Dónde se guardan los posts ya vistos (`seen-posts.json`)          |
-| `BOT_MAX_AGE_MINUTES` | env (opcional) | Antigüedad máxima de un post (120) |
-| `BOT_MAX_PER_SOURCE` | env (opcional) | Posts por fuente y por corrida (3) |
-| `ONLY_SOURCE`       | env (opcional)            | Corre una sola fuente, por su nombre en `src/sources`            |
+| Nombre                | Dónde                     | Qué es                                                         |
+| --------------------- | ------------------------- | -------------------------------------------------------------- |
+| `TARGET_URL`          | Variable de Actions / env | Origen del sitio de destino                                    |
+| `BOT_INGEST_SECRET`   | Secreto de Actions / env  | Secreto compartido que abre el endpoint de ingesta (≥ 24 car.) |
+| `BOT_ENABLED`         | Variable de Actions       | `true` enciende el workflow; sin ella no corre                 |
+| `STATE_FILE`          | env (opcional)            | Dónde se guardan los posts ya vistos (`seen-posts.json`)       |
+| `BOT_MAX_AGE_MINUTES` | env (opcional)            | Antigüedad máxima de un post (120)                             |
+| `BOT_GAP_SECONDS`     | env (opcional)            | Espera tras cada oferta publicada (45)                         |
+| `ONLY_SOURCE`         | env (opcional)            | Corre una sola fuente, por su nombre en `src/sources`          |
 
 Puesta en marcha: Settings → Secrets and variables → Actions → definir `BOT_INGEST_SECRET`, `TARGET_URL` y `BOT_ENABLED=true`; luego Actions → run bot → Run workflow para probar.
 

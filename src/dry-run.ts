@@ -6,7 +6,7 @@ import { SeenPosts } from "./state.ts";
 
 /**
  * Reads the sources and prints what the next run would send to the destination site, with the
- * same selection (recent, newest few per source). Publishes nothing and remembers nothing.
+ * same selection (recent posts, oldest first). Publishes nothing and remembers nothing.
  * `npm run dry-run [source]` reads one source; the first RESOLVE offers of each get their link
  * followed to the store.
  */
@@ -27,10 +27,10 @@ for (const source of SOURCES.filter((s) => !only || s.name === only)) {
     console.log(`${source.name}: FAILED ${String(error)}\n`);
     continue;
   }
-  const selected = selectOffers(offers, { seen, now, ...policy });
+  const selected = selectOffers(offers, { seen, now, maxAgeMs: policy.maxAgeMs });
   console.log(
     `${source.name}: ${offers.length} offers read, ${selected.length} would be sent ` +
-      `(max ${policy.limit}, at most ${policy.maxAgeMs / 60_000} min old)\n`,
+      `(at most ${policy.maxAgeMs / 60_000} min old, one every ${policy.gapMs / 1_000} s)\n`,
   );
 
   for (const [index, o] of selected.entries()) {

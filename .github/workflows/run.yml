@@ -19,7 +19,7 @@ jobs:
     # Off until the repository variable BOT_ENABLED is "true" (Settings → Secrets and variables → Actions).
     if: vars.BOT_ENABLED == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 

@@ -10,22 +10,21 @@ export type RunSummary = {
   rejected: Record<string, number>;
   retry: number;
   /** Why the run stopped early, if it did. */
-  stopped: "capped" | "fatal" | null;
+  stopped: "capped" | "fatal" | "budget" | null;
   detail: string | null;
 };
 
-/** The posts worth sending now: unseen, not ended, recent; the newest `limit`, oldest first. */
+/** The posts worth sending now: unseen, not ended and recent, oldest first. */
 export function selectOffers(
   offers: SourceOffer[],
-  options: { seen: SeenPosts; now: Date; maxAgeMs?: number; limit?: number },
+  options: { seen: SeenPosts; now: Date; maxAgeMs?: number },
 ): SourceOffer[] {
-  const { seen, now, maxAgeMs, limit } = options;
-  const fresh = offers
+  const { seen, now, maxAgeMs } = options;
+  return offers
     .filter((o) => !seen.has(o))
     .filter((o) => o.endAt === null || o.endAt.getTime() > now.getTime())
     .filter((o) => maxAgeMs === undefined || now.getTime() - o.publishedAt.getTime() <= maxAgeMs)
-    .sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime());
-  return fresh.slice(0, limit ?? fresh.length).reverse();
+    .sort((a, b) => a.publishedAt.getTime() - b.publishedAt.getTime());
 }
 
 export type RunDeps = {
@@ -35,20 +34,33 @@ export type RunDeps = {
   now?: () => Date;
   /** Only posts at most this old (ms). */
   maxAgeMs?: number;
-  /** At most this many posts per run: the newest ones. */
-  limit?: number;
-  /** Pause between offers, so the stores are not hit in a burst. */
-  delayMs?: number;
+  /** Queue: wait this long (ms) after each published offer before the next one. */
+  gapMs?: number;
+  /** Short pause (ms) after an offer that was not published, so the stores are not hit in a burst. */
+  politeMs?: number;
+  /** Epoch ms after which no new offer is started; the rest waits for the next run. */
+  deadline?: number;
+  sleep?: (ms: number) => Promise<void>;
   log?: (line: string) => void;
 };
 
 /**
- * Sends the selected offers (see selectOffers) to the destination site, oldest first so the feed keeps their order.
- * A post is remembered once the destination site has decided it (published, duplicate or rejected for good);
- * a failure that may pass (server or network trouble) is retried next run.
+ * Sends the selected offers (see selectOffers) to the destination site, oldest first so the feed
+ * keeps their order, as a queue: after each published offer it waits `gapMs`.
+ * A post is remembered once the destination site has decided it (published, duplicate or rejected
+ * for good); a failure that may pass (server or network trouble) is retried next run.
  */
 export async function runOnce(deps: RunDeps): Promise<RunSummary> {
-  const { offers, ingest, seen, now = () => new Date(), delayMs = 0, log = () => {} } = deps;
+  const {
+    offers,
+    ingest,
+    seen,
+    now = () => new Date(),
+    gapMs = 0,
+    politeMs = 0,
+    sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    log = () => {},
+  } = deps;
   const summary: RunSummary = {
     read: offers.length,
     skipped: 0,
@@ -60,17 +72,16 @@ export async function runOnce(deps: RunDeps): Promise<RunSummary> {
     detail: null,
   };
 
-  const pending = selectOffers(offers, {
-    seen,
-    now: now(),
-    maxAgeMs: deps.maxAgeMs,
-    limit: deps.limit,
-  });
+  const pending = selectOffers(offers, { seen, now: now(), maxAgeMs: deps.maxAgeMs });
   summary.skipped = offers.length - pending.length;
 
-  for (const offer of pending) {
+  for (const [index, offer] of pending.entries()) {
+    if (deps.deadline !== undefined && now().getTime() >= deps.deadline) {
+      summary.stopped = "budget";
+      break;
+    }
     const outcome = await ingest(offer);
-    log(`#${offer.sourceId} ${offer.title.slice(0, 50)} -> ${outcome.kind}`);
+    log(`${offer.source}#${offer.sourceId} ${offer.title.slice(0, 50)} -> ${outcome.kind}`);
 
     if (outcome.kind === "capped" || outcome.kind === "fatal") {
       summary.stopped = outcome.kind;
@@ -86,7 +97,8 @@ export async function runOnce(deps: RunDeps): Promise<RunSummary> {
       else if (outcome.kind === "duplicate") summary.duplicates += 1;
       else summary.rejected[outcome.reason] = (summary.rejected[outcome.reason] ?? 0) + 1;
     }
-    if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
+    const wait = outcome.kind === "published" ? gapMs : politeMs;
+    if (wait > 0 && index < pending.length - 1) await sleep(wait);
   }
   return summary;
 }
