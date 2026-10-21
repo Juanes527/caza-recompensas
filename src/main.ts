@@ -1,4 +1,5 @@
 import { ingestConfigFromEnv, ingestOffer } from "./destination.ts";
+import { policyFromEnv } from "./policy.ts";
 import { runOnce, type RunSummary } from "./run.ts";
 import { SOURCES } from "./sources/index.ts";
 import { SeenPosts } from "./state.ts";
@@ -6,17 +7,23 @@ import { SeenPosts } from "./state.ts";
 const config = ingestConfigFromEnv();
 const seen = new SeenPosts(process.env.STATE_FILE ?? "seen-posts.json");
 const only = process.env.ONLY_SOURCE;
+const policy = policyFromEnv();
 
 let failed = false;
 for (const source of SOURCES.filter((s) => !only || s.name === only)) {
   // One broken source must not stop the others: report it and go on.
   let summary: RunSummary;
   try {
-    const offers = await source.read((id) => seen.hasId(source.name, id));
+    const offers = await source.read({
+      isSeen: (id) => seen.hasId(source.name, id),
+      since: new Date(Date.now() - policy.maxAgeMs),
+    });
     summary = await runOnce({
       offers,
       ingest: (offer) => ingestOffer(config, offer),
       seen,
+      maxAgeMs: policy.maxAgeMs,
+      limit: policy.limit,
       delayMs: 3_000,
       log: (line) => console.log(`[${source.name}] ${line}`),
     });

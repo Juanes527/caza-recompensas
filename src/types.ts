@@ -22,8 +22,8 @@ export type SourceOffer = {
 export type Source = {
   name: string;
   /**
-   * The offers currently listed. `isSeen` lets a source skip the expensive part (opening a post's
-   * own page) for posts already decided.
+   * The offers currently listed. `isSeen` and `since` let a source skip the expensive part
+   * (opening a post's own page) for posts already decided or older than the policy allows.
    */
-  read(isSeen: (sourceId: string) => boolean): Promise<SourceOffer[]>;
+  read(context: { isSeen: (sourceId: string) => boolean; since: Date }): Promise<SourceOffer[]>;
 };

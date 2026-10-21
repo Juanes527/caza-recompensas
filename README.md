@@ -29,6 +29,16 @@ GitHub Actions (cada 30 min)
 | 5xx / red             | Reintenta esa oferta en la próxima corrida                 |
 | 401 / 503             | Para y termina con error (secreto malo o endpoint apagado) |
 
+## Qué publica
+
+El bot sigue a las comunidades, no copia sus páginas. En cada corrida, por fuente:
+
+1. Solo posts **recientes**: publicados hace menos de 120 minutos (`BOT_MAX_AGE_MINUTES`). Así, la primera corrida no sube la portada entera.
+2. Se quitan los ya vistos y los que ya vencieron.
+3. Se toman los **3 más nuevos** (`BOT_MAX_PER_SOURCE`) y se envían del más antiguo al más nuevo.
+
+Con tres fuentes y una corrida cada 30 minutos son como máximo 9 ofertas por corrida (el destino además limita por hora). Los posts que no entran vuelven a competir en la corrida siguiente mientras sigan dentro de la ventana; los que envejecen, se pierden. `npm run dry-run` muestra exactamente qué se enviaría.
+
 ## Fuentes
 
 Ninguna tiene API oficial. Hay dos formas de leerlas (`src/sources`):
@@ -46,6 +56,8 @@ Agregar una fuente es crear un archivo en `src/sources` que cumpla `Source` (ver
 | `BOT_INGEST_SECRET` | Secreto de Actions / env  | Secreto compartido que abre el endpoint de ingesta (≥ 24 car.)    |
 | `BOT_ENABLED`       | Variable de Actions       | `true` enciende el workflow; sin ella no corre                    |
 | `STATE_FILE`        | env (opcional)            | Dónde se guardan los posts ya vistos (`seen-posts.json`)          |
+| `BOT_MAX_AGE_MINUTES` | env (opcional) | Antigüedad máxima de un post (120) |
+| `BOT_MAX_PER_SOURCE` | env (opcional) | Posts por fuente y por corrida (3) |
 | `ONLY_SOURCE`       | env (opcional)            | Corre una sola fuente, por su nombre en `src/sources`            |
 
 Puesta en marcha: Settings → Secrets and variables → Actions → definir `BOT_INGEST_SECRET`, `TARGET_URL` y `BOT_ENABLED=true`; luego Actions → run bot → Run workflow para probar.

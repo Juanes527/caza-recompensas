@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 import { ingestOffer, type IngestOutcome } from "../src/destination.ts";
-import { runOnce } from "../src/run.ts";
+import { policyFromEnv } from "../src/policy.ts";
+import { runOnce, selectOffers } from "../src/run.ts";
 import { SeenPosts } from "../src/state.ts";
 import type { SourceOffer } from "../src/types.ts";
 
@@ -148,5 +149,54 @@ describe("ingestOffer", () => {
       fetch: vi.fn(async () => Promise.reject(new Error("down"))) as unknown as typeof fetch,
     };
     expect(await ingestOffer(c, offer(1))).toMatchObject({ kind: "retry" });
+  });
+});
+
+describe("selectOffers", () => {
+  const ago = (minutes: number) => new Date(NOW.getTime() - minutes * 60_000);
+  const post = (id: number, minutes: number, extra: Partial<SourceOffer> = {}) =>
+    offer(id, { publishedAt: ago(minutes), ...extra });
+
+  it("takes only recent posts, so a first run does not publish a whole page", () => {
+    const selected = selectOffers([post(1, 10), post(2, 119), post(3, 121), post(4, 600)], {
+      seen: seenFile(),
+      now: NOW,
+      maxAgeMs: 120 * 60_000,
+    });
+    expect(selected.map((o) => o.sourceId)).toEqual(["2", "1"]);
+  });
+
+  it("keeps the newest few when there are more, and sends them oldest first", () => {
+    const offers = [post(1, 50), post(2, 40), post(3, 30), post(4, 20), post(5, 10)];
+    const selected = selectOffers(offers, { seen: seenFile(), now: NOW, limit: 3 });
+    expect(selected.map((o) => o.sourceId)).toEqual(["3", "4", "5"]);
+  });
+
+  it("leaves out seen posts and deals that ended, before counting the limit", () => {
+    const seen = seenFile();
+    seen.add(post(5, 1));
+    const offers = [
+      post(1, 50),
+      post(2, 40, { endAt: ago(1) }),
+      post(3, 30),
+      post(4, 20),
+      post(5, 1),
+    ];
+    const selected = selectOffers(offers, { seen, now: NOW, limit: 2 });
+    expect(selected.map((o) => o.sourceId)).toEqual(["3", "4"]);
+  });
+});
+
+describe("policyFromEnv", () => {
+  it("defaults to the last two hours and three posts per source, and accepts overrides", () => {
+    expect(policyFromEnv({})).toEqual({ maxAgeMs: 120 * 60_000, limit: 3 });
+    expect(policyFromEnv({ BOT_MAX_AGE_MINUTES: "30", BOT_MAX_PER_SOURCE: "1" })).toEqual({
+      maxAgeMs: 30 * 60_000,
+      limit: 1,
+    });
+    expect(policyFromEnv({ BOT_MAX_AGE_MINUTES: "-5", BOT_MAX_PER_SOURCE: "x" })).toEqual({
+      maxAgeMs: 120 * 60_000,
+      limit: 3,
+    });
   });
 });

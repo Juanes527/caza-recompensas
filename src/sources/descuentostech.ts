@@ -122,12 +122,12 @@ async function readDetail(page: Page, href: string): Promise<DescuentosTechDetai
 
 export const descuentostech: Source = {
   name: "descuentostech",
-  read: (isSeen) =>
+  read: ({ isSeen, since }) =>
     withPage(async (page) => {
       const now = new Date();
       const cards = (await readCards(page)).filter((c) => {
         const id = descuentosTechId(c.href);
-        return id !== null && !isSeen(id);
+        return id !== null && !isSeen(id) && relativeTime(c.text, now) >= since;
       });
       const offers: SourceOffer[] = [];
       for (const card of cards.slice(0, MAX_DETAIL_PAGES)) {

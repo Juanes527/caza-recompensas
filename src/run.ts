@@ -14,18 +14,36 @@ export type RunSummary = {
   detail: string | null;
 };
 
+/** The posts worth sending now: unseen, not ended, recent; the newest `limit`, oldest first. */
+export function selectOffers(
+  offers: SourceOffer[],
+  options: { seen: SeenPosts; now: Date; maxAgeMs?: number; limit?: number },
+): SourceOffer[] {
+  const { seen, now, maxAgeMs, limit } = options;
+  const fresh = offers
+    .filter((o) => !seen.has(o))
+    .filter((o) => o.endAt === null || o.endAt.getTime() > now.getTime())
+    .filter((o) => maxAgeMs === undefined || now.getTime() - o.publishedAt.getTime() <= maxAgeMs)
+    .sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime());
+  return fresh.slice(0, limit ?? fresh.length).reverse();
+}
+
 export type RunDeps = {
   offers: SourceOffer[];
   ingest: (offer: SourceOffer) => Promise<IngestOutcome>;
   seen: SeenPosts;
   now?: () => Date;
+  /** Only posts at most this old (ms). */
+  maxAgeMs?: number;
+  /** At most this many posts per run: the newest ones. */
+  limit?: number;
   /** Pause between offers, so the stores are not hit in a burst. */
   delayMs?: number;
   log?: (line: string) => void;
 };
 
 /**
- * Sends the unseen, still-valid offers to the destination site, oldest first so the feed keeps their order.
+ * Sends the selected offers (see selectOffers) to the destination site, oldest first so the feed keeps their order.
  * A post is remembered once the destination site has decided it (published, duplicate or rejected for good);
  * a failure that may pass (server or network trouble) is retried next run.
  */
@@ -42,9 +60,12 @@ export async function runOnce(deps: RunDeps): Promise<RunSummary> {
     detail: null,
   };
 
-  const pending = offers
-    .filter((o) => !seen.has(o) && (o.endAt === null || o.endAt.getTime() > now().getTime()))
-    .sort((a, b) => a.publishedAt.getTime() - b.publishedAt.getTime());
+  const pending = selectOffers(offers, {
+    seen,
+    now: now(),
+    maxAgeMs: deps.maxAgeMs,
+    limit: deps.limit,
+  });
   summary.skipped = offers.length - pending.length;
 
   for (const offer of pending) {
