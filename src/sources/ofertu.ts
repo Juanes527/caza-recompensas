@@ -33,6 +33,10 @@ function toOffer(raw: unknown): SourceOffer | null {
     currency: "COP",
     coupon: text(raw.code),
     category: null,
+    // Ofertu: shipping_cost 0 = "Envío gratis", applies_shipping = "Elegible para envío gratis".
+    freeShipping: raw.shipping_cost === 0,
+    freeShippingEligible: raw.applies_shipping === true,
+    requiresMailbox: raw.virtual_locker === true,
     publishedAt,
     endAt: date(raw.end_date),
     imageUrl: text(raw.image_url),

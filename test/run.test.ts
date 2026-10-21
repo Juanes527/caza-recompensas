@@ -22,6 +22,9 @@ const offer = (id: number, extra: Partial<SourceOffer> = {}): SourceOffer => ({
   currency: "COP",
   coupon: null,
   category: null,
+  freeShipping: false,
+  freeShippingEligible: false,
+  requiresMailbox: false,
   publishedAt: new Date(NOW.getTime() - id * 60_000),
   endAt: null,
   imageUrl: null,
@@ -114,7 +117,16 @@ describe("ingestOffer", () => {
 
   it("sends only the facts of the post, with the secret", async () => {
     const c = config(201, { slug: "x" });
-    await ingestOffer(c, offer(1, { coupon: "ABC12", category: "CUIDADO FACIAL", endAt: NOW }));
+    await ingestOffer(
+      c,
+      offer(1, {
+        coupon: "ABC12",
+        category: "CUIDADO FACIAL",
+        freeShippingEligible: true,
+        requiresMailbox: true,
+        endAt: NOW,
+      }),
+    );
     const [url, init] = vi.mocked(c.fetch).mock.calls[0]!;
     expect(String(url)).toBe("https://example.com/api/bot/ingest");
     expect((init!.headers as Record<string, string>).authorization).toBe(
@@ -125,6 +137,8 @@ describe("ingestOffer", () => {
       title: "Oferta 1",
       couponCode: "ABC12",
       category: "CUIDADO FACIAL",
+      freeShippingEligible: true,
+      requiresMailbox: true,
       currentPrice: 1000,
       originalPrice: 2000,
       endAt: NOW.toISOString(),

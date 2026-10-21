@@ -42,7 +42,7 @@ for (const source of SOURCES.filter((s) => !only || s.name === only)) {
       [
         `#${o.sourceId} ${o.title.slice(0, 70)}`,
         `   ${o.shop ?? "?"} · cat ${o.category ?? "-"} · ${o.price ?? "?"} COP (before ${o.normalPrice ?? "?"})` +
-          ` · coupon ${o.coupon ?? "-"} · posted ${o.publishedAt.toISOString()}`,
+          ` · coupon ${o.coupon ?? "-"}${o.freeShipping ? " · ENVÍO GRATIS" : ""}${o.freeShippingEligible ? " · elegible envío gratis" : ""}${o.requiresMailbox ? " · CASILLERO" : ""} · posted ${o.publishedAt.toISOString()}`,
         `   ${o.link}\n   -> ${store}`,
       ].join("\n"),
     );

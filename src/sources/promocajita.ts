@@ -19,6 +19,11 @@ export type PromocajitaCard = {
 
 const OBJECT_ID = /([0-9a-f]{24})$/;
 
+/** The card lists its shipping facts as lines: "Envío gratis", "Elegible Envío gratis", "Requiere Casillero". */
+function hasLine(text: string, pattern: RegExp): boolean {
+  return text.split("\n").some((line) => pattern.test(line.trim()));
+}
+
 function createdAt(objectId: string): Date | null {
   const date = new Date(parseInt(objectId.slice(0, 8), 16) * 1000);
   return Number.isNaN(date.getTime()) ? null : date;
@@ -49,6 +54,9 @@ export function parsePromocajita(cards: PromocajitaCard[], now: Date): SourceOff
       // The home card does not show the coupon; it is on the offer page (not read yet).
       coupon: null,
       category: card.category?.replace(/s+/g, " ").trim() || null,
+      freeShipping: hasLine(card.text, /^env[ií]o gratis$/i),
+      freeShippingEligible: hasLine(card.text, /^elegible\s+env[ií]o gratis$/i),
+      requiresMailbox: hasLine(card.text, /^requiere\s+casillero$/i),
       publishedAt: createdAt(id) ?? relativeTime(card.text, now),
       endAt: null,
       imageUrl: card.image,

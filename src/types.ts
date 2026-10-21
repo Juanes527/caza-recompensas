@@ -13,6 +13,10 @@ export type SourceOffer = {
   coupon: string | null;
   /** The category the source community chose, by name; null when the source shows none. */
   category: string | null;
+  /** What the post says about shipping; false when it says nothing. */
+  freeShipping: boolean;
+  freeShippingEligible: boolean;
+  requiresMailbox: boolean;
   publishedAt: Date;
   endAt: Date | null;
   imageUrl: string | null;

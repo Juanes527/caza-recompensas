@@ -23,6 +23,16 @@ describe("parseOfertuHome", () => {
     expect(offers[0]?.endAt).toBeInstanceOf(Date);
   });
 
+  it("reads the shipping facts: cost 0 is free shipping, applies_shipping is eligible", () => {
+    expect(offers[0]).toMatchObject({
+      freeShipping: true,
+      freeShippingEligible: false,
+      requiresMailbox: false,
+    });
+    expect(offers[1]).toMatchObject({ freeShipping: false, freeShippingEligible: false });
+    expect(offers[2]).toMatchObject({ freeShipping: false, freeShippingEligible: true });
+  });
+
   it("keeps the coupon code when the post has one", () => {
     expect(offers[1]?.coupon).toBe("CUPON10");
   });

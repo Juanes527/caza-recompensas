@@ -61,6 +61,10 @@ export function toOffer(
     currency: "COP",
     coupon: detail.coupon,
     category: detail.category,
+    // The offer page shows nothing about shipping.
+    freeShipping: false,
+    freeShippingEligible: false,
+    requiresMailbox: false,
     publishedAt: relativeTime(card.text, now),
     endAt: null,
     imageUrl: detail.image ?? card.image,

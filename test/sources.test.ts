@@ -48,6 +48,28 @@ describe("parsePromocajita", () => {
     expect(offer?.publishedAt.toISOString()).toBe(new Date(0x6ad929ea * 1000).toISOString());
   });
 
+  it("reads free shipping, eligible-for-free-shipping and mailbox from the card lines", () => {
+    const shipping = (lines: string) =>
+      parsePromocajita([card({ text: `Hace 8 minutos\n$217.610 COP\n${lines}` })], NOW)[0];
+    expect(shipping("Envío gratis")).toMatchObject({
+      freeShipping: true,
+      freeShippingEligible: false,
+      requiresMailbox: false,
+    });
+    expect(shipping("Elegible Envío gratis")).toMatchObject({
+      freeShipping: false,
+      freeShippingEligible: true,
+    });
+    expect(shipping("Requiere Casillero\nEnvío gratis")).toMatchObject({
+      freeShipping: true,
+      requiresMailbox: true,
+    });
+    expect(shipping("Tienda Amazon")).toMatchObject({
+      freeShipping: false,
+      requiresMailbox: false,
+    });
+  });
+
   it("keeps no old price when the card shows only one", () => {
     const [offer] = parsePromocajita(
       [card({ text: "Hace 8 minutos\n$217.610 COP\nTienda Amazon" })],
