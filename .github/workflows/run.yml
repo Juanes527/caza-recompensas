@@ -55,10 +55,14 @@ jobs:
       - name: Install the browser
         run: npx playwright install --with-deps chromium
         if: steps.browser.outputs.cache-hit != 'true'
+        # A hung download once held the whole job until its 40-minute limit, which cancelled it
+        # and ended the chain. A stuck step now fails on its own and the chain goes on.
+        timeout-minutes: 8
 
       - name: Install the browser's system libraries
         run: npx playwright install-deps chromium
         if: steps.browser.outputs.cache-hit == 'true'
+        timeout-minutes: 8
 
       # The posts already decided survive between runs in the Actions cache until the bot gets
       # its Supabase table. A new key each run, restored from the latest one.
