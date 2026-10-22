@@ -45,7 +45,7 @@ Al ritmo de 45 s salen como máximo unas 80 ofertas por hora. `npm run dry-run` 
 Ninguna tiene API oficial. Hay dos formas de leerlas (`src/sources`):
 
 - **Datos embebidos en el HTML:** algunas páginas traen el listado como JSON dentro de la propia página. Se lee con `fetch`, sin navegador, y suele incluir precio, cupón y fecha de fin.
-- **Aplicaciones de una sola página:** el HTML llega vacío, así que se renderizan con Playwright. Si el enlace de la tienda y el cupón están en la página de cada oferta, solo se abren las no vistas (máx. 12 por corrida). Los enlaces de Amazon OneLink (`amazon.co.uk/…?ar_su=`) se desenvuelven al producto real, y las ofertas que son cupones de tienda (sin enlace de producto) se omiten.
+- **Aplicaciones de una sola página:** el HTML llega vacío, así que se renderizan con Playwright. Si el enlace de la tienda, el cupón o la imagen (`og:image`) solo están en la página de cada oferta, se abre únicamente para las no vistas y recientes (máx. 12 a 15 por corrida). Los enlaces de Amazon OneLink (`amazon.co.uk/…?ar_su=`) se desenvuelven al producto real, y las ofertas que son cupones de tienda (sin enlace de producto) se omiten.
 
 Agregar una fuente es crear un archivo en `src/sources` que cumpla `Source` (ver `src/types.ts`) y registrarlo en `src/sources/index.ts`.
 
