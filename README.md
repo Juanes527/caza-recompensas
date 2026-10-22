@@ -7,7 +7,7 @@ Estado: lee tres fuentes y publica en el sitio de destino. `npm run dry-run [fue
 ## Principios
 
 1. **Solo hechos, no contenido.** De cada post se toma el enlace de la tienda, el cupón, el precio, la categoría y un título. Las fotos las pone el sitio de destino, desde la tienda; la descripción no se copia.
-2. **Nunca se reenvía el afiliado de otra comunidad.** El enlace llega al destino tal cual lo publicó la fuente y el destino lo resuelve hasta la tienda, quita los parámetros de afiliado y añade el suyo.
+2. **Nunca se reenvía el afiliado de otra comunidad.** El bot resuelve el enlace corto hasta la tienda (las tiendas bloquean con frecuencia al servidor del destino) y quita los parámetros de afiliado; si la tienda responde con una página de error deja el enlace original. El destino lo limpia otra vez y añade el suyo.
 3. **El destino decide.** Rechaza duplicados, tiendas desconocidas, ofertas vencidas y ofertas sin imágenes; el bot solo recuerda lo ya decidido.
 4. **Una fuente rota no detiene a las demás.** Se registra el fallo, se sigue con las otras y la corrida termina en error para que GitHub avise por correo.
 

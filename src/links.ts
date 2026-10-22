@@ -25,6 +25,29 @@ export async function resolveStoreUrl(link: string): Promise<string> {
   throw new Error("too many redirects");
 }
 
+/** Where stores send robots and failed requests instead of the product. */
+const ERROR_PAGE =
+  /\/(?:n\/)?error\b|[?&]statuscode=|validatecaptcha|\/captcha\b|account-verification|access-denied/i;
+
+export function looksLikeErrorPage(link: string): boolean {
+  return ERROR_PAGE.test(link);
+}
+
+/**
+ * The store link of a post, for the destination site. Short links (link.amazon, amzn.to…) go
+ * through several redirects that the destination's own fetcher cannot always follow, so they are
+ * resolved here, where it works. When the store answers with an error page or the resolution
+ * fails, the original link is kept: sending a link to an error page would publish a broken offer.
+ */
+export async function resolveOrKeep(link: string): Promise<string> {
+  try {
+    const resolved = await resolveStoreUrl(link);
+    return looksLikeErrorPage(resolved) ? link : resolved;
+  } catch {
+    return link;
+  }
+}
+
 export function clean(url: URL): string {
   const out = new URL(url);
   for (const key of [...out.searchParams.keys()]) {

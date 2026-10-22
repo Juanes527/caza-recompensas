@@ -81,7 +81,13 @@ export async function runOnce(deps: RunDeps): Promise<RunSummary> {
       break;
     }
     const outcome = await ingest(offer);
-    log(`${offer.source}#${offer.sourceId} ${offer.title.slice(0, 50)} -> ${outcome.kind}`);
+    const why =
+      outcome.kind === "rejected"
+        ? ` (${outcome.reason})`
+        : outcome.kind === "retry" || outcome.kind === "fatal"
+          ? ` (${outcome.detail})`
+          : "";
+    log(`${offer.source}#${offer.sourceId} ${offer.title.slice(0, 50)} -> ${outcome.kind}${why}`);
 
     if (outcome.kind === "capped" || outcome.kind === "fatal") {
       summary.stopped = outcome.kind;

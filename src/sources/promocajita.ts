@@ -1,3 +1,5 @@
+import type { Page } from "playwright";
+
 import { copAmounts, relativeTime, withPage } from "../browser.ts";
 import type { Source, SourceOffer } from "../types.ts";
 
@@ -53,7 +55,7 @@ export function parsePromocajita(cards: PromocajitaCard[], now: Date): SourceOff
       currency: "COP",
       // The home card does not show the coupon; it is on the offer page (not read yet).
       coupon: null,
-      category: card.category?.replace(/s+/g, " ").trim() || null,
+      category: card.category?.replace(/\s+/g, " ").trim() || null,
       freeShipping: hasLine(card.text, /^env[ií]o gratis$/i),
       freeShippingEligible: hasLine(card.text, /^elegible\s+env[ií]o gratis$/i),
       requiresMailbox: hasLine(card.text, /^requiere\s+casillero$/i),
@@ -65,8 +67,8 @@ export function parsePromocajita(cards: PromocajitaCard[], now: Date): SourceOff
   return offers;
 }
 
-async function readCards(): Promise<PromocajitaCard[]> {
-  return withPage(async (page) => {
+async function readCards(page: Page): Promise<PromocajitaCard[]> {
+  {
     await page.goto(PROMOCAJITA_HOME, { waitUntil: "domcontentloaded" });
     await page.waitForFunction(
       () => document.querySelectorAll('a[href^="/deal/"]').length >= 10,
@@ -105,10 +107,55 @@ async function readCards(): Promise<PromocajitaCard[]> {
       }
       return cards;
     });
-  });
+  }
+}
+
+/** Offer pages opened per run for their picture: the newest ones; the rest wait for the next run. */
+const MAX_IMAGE_PAGES = 15;
+const OFFER_IMAGE = /\/images\/offers\//;
+
+/**
+ * Most home cards show no picture (they load it lazily, and only a few ever do), but the offer's
+ * own page sets `og:image` to the full-size picture (about 1200 px) once it has rendered.
+ */
+async function readDealImage(page: Page, href: string): Promise<string | null> {
+  try {
+    await page.goto(new URL(href, PROMOCAJITA_HOME).toString(), { waitUntil: "domcontentloaded" });
+    await page.waitForFunction(
+      () =>
+        /\/images\/offers\//.test(
+          document.querySelector('meta[property="og:image"]')?.getAttribute("content") ?? "",
+        ),
+      undefined,
+      { timeout: 10_000 },
+    );
+    const image = await page.evaluate(
+      () => document.querySelector('meta[property="og:image"]')?.getAttribute("content") ?? null,
+    );
+    return image && OFFER_IMAGE.test(image) ? image : null;
+  } catch {
+    return null;
+  }
 }
 
 export const promocajita: Source = {
   name: "promocajita",
-  read: async () => parsePromocajita(await readCards(), new Date()),
+  read: ({ isSeen, since }) =>
+    withPage(async (page) => {
+      const cards = await readCards(page);
+      const offers = parsePromocajita(cards, new Date());
+      const hrefOf = new Map(cards.map((c) => [OBJECT_ID.exec(c.href)?.[1], c.href]));
+
+      const pending = offers
+        .filter((o) => !isSeen(o.sourceId) && o.publishedAt >= since)
+        .sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime())
+        .slice(0, MAX_IMAGE_PAGES);
+      for (const offer of pending) {
+        const href = hrefOf.get(offer.sourceId);
+        const image = href ? await readDealImage(page, href) : null;
+        // The card's thumbnail (300 px) is the fallback when the page gives no picture.
+        if (image) offer.imageUrl = image;
+      }
+      return offers;
+    }),
 };

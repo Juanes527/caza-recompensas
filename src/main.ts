@@ -1,4 +1,5 @@
 import { ingestConfigFromEnv, ingestOffer } from "./destination.ts";
+import { resolveOrKeep } from "./links.ts";
 import { policyFromEnv, POLITE_MS, RUN_BUDGET_MS } from "./policy.ts";
 import { runOnce } from "./run.ts";
 import { SOURCES } from "./sources/index.ts";
@@ -31,7 +32,7 @@ for (const source of SOURCES.filter((s) => !only || s.name === only)) {
 
 const summary = await runOnce({
   offers,
-  ingest: (offer) => ingestOffer(config, offer),
+  ingest: async (offer) => ingestOffer(config, { ...offer, link: await resolveOrKeep(offer.link) }),
   seen,
   maxAgeMs: policy.maxAgeMs,
   gapMs: policy.gapMs,
