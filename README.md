@@ -51,15 +51,16 @@ Agregar una fuente es crear un archivo en `src/sources` que cumpla `Source` (ver
 
 ## Configuración
 
-| Nombre                | Dónde                     | Qué es                                                         |
-| --------------------- | ------------------------- | -------------------------------------------------------------- |
-| `TARGET_URL`          | Variable de Actions / env | Origen del sitio de destino                                    |
-| `BOT_INGEST_SECRET`   | Secreto de Actions / env  | Secreto compartido que abre el endpoint de ingesta (≥ 24 car.) |
-| `BOT_ENABLED`         | Variable de Actions       | `true` enciende el workflow; sin ella no corre                 |
-| `STATE_FILE`          | env (opcional)            | Dónde se guardan los posts ya vistos (`seen-posts.json`)       |
-| `BOT_MAX_AGE_MINUTES` | env (opcional)            | Antigüedad máxima de un post (120)                             |
-| `BOT_GAP_SECONDS`     | env (opcional)            | Espera tras cada oferta publicada (45)                         |
-| `ONLY_SOURCE`         | env (opcional)            | Corre una sola fuente, por su nombre en `src/sources`          |
+| Nombre                | Dónde                     | Qué es                                                           |
+| --------------------- | ------------------------- | ---------------------------------------------------------------- |
+| `TARGET_URL`          | Variable de Actions / env | Origen del sitio de destino                                      |
+| `BOT_INGEST_SECRET`   | Secreto de Actions / env  | Secreto compartido que abre el endpoint de ingesta (≥ 24 car.)   |
+| `BOT_ENABLED`         | Variable de Actions       | `true` enciende el workflow; sin ella no corre                   |
+| `STATE_FILE`          | env (opcional)            | Dónde se guardan los posts ya vistos (`seen-posts.json`)         |
+| `BOT_MAX_AGE_MINUTES` | Variable de Actions       | Antigüedad máxima de un post (120)                               |
+| `BOT_GAP_SECONDS`     | Variable de Actions       | Espera tras cada oferta publicada (45)                           |
+| `BOT_CYCLE_MINUTES`   | Variable de Actions       | Minutos entre el inicio de una corrida y el de la siguiente (30) |
+| `ONLY_SOURCE`         | env (opcional)            | Corre una sola fuente, por su nombre en `src/sources`            |
 
 Puesta en marcha: Settings → Secrets and variables → Actions → definir `BOT_INGEST_SECRET`, `TARGET_URL` y `BOT_ENABLED=true`; luego Actions → run bot → Run workflow **una vez**: desde ahí sigue solo.
 

@@ -75,6 +75,9 @@ jobs:
         env:
           TARGET_URL: ${{ vars.TARGET_URL }}
           BOT_INGEST_SECRET: ${{ secrets.BOT_INGEST_SECRET }}
+          # Optional repository variables; empty means the default (see src/policy.ts).
+          BOT_MAX_AGE_MINUTES: ${{ vars.BOT_MAX_AGE_MINUTES }}
+          BOT_GAP_SECONDS: ${{ vars.BOT_GAP_SECONDS }}
 
       - name: Save seen posts
         if: always() && hashFiles('seen-posts.json') != ''
@@ -89,7 +92,8 @@ jobs:
         if: ${{ !cancelled() }}
         env:
           GH_TOKEN: ${{ github.token }}
-          CYCLE_MINUTES: ${{ inputs.cycle_minutes || '30' }}
+          # A manual run can set it for itself; the chained ones use the repository variable.
+          CYCLE_MINUTES: ${{ inputs.cycle_minutes || vars.BOT_CYCLE_MINUTES || '30' }}
         run: |
           wait=$(( CYCLE_MINUTES * 60 - ( $(date +%s) - RUN_STARTED ) ))
           if [ "$wait" -gt 0 ]; then
