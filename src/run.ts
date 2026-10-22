@@ -47,8 +47,8 @@ export type RunDeps = {
 /**
  * Sends the selected offers (see selectOffers) to the destination site, oldest first so the feed
  * keeps their order, as a queue: after each published offer it waits `gapMs`.
- * A post is remembered once the destination site has decided it (published, duplicate or rejected
- * for good); a failure that may pass (server or network trouble) is retried next run.
+ * A post is remembered once the destination site has settled it (published, duplicate or ended);
+ * a rejection or a failure that may pass (server or network trouble) is retried next run.
  */
 export async function runOnce(deps: RunDeps): Promise<RunSummary> {
   const {
@@ -98,7 +98,11 @@ export async function runOnce(deps: RunDeps): Promise<RunSummary> {
       summary.retry += 1;
       summary.detail = outcome.detail;
     } else {
-      seen.add(offer);
+      // Only a verdict that cannot change is remembered. A rejection (no picture, a store that is
+      // not registered yet, a store's error page) can be fixed by the next deploy or by adding the
+      // store, so the offer is tried again on the next runs while it is still recent; the
+      // destination rejects duplicates anyway. An ended deal never comes back.
+      if (outcome.kind !== "rejected" || outcome.reason === "expired") seen.add(offer);
       if (outcome.kind === "published") summary.published += 1;
       else if (outcome.kind === "duplicate") summary.duplicates += 1;
       else summary.rejected[outcome.reason] = (summary.rejected[outcome.reason] ?? 0) + 1;

@@ -20,14 +20,14 @@ GitHub Actions (cada 30 min)
                          POST {TARGET_URL}/api/bot/ingest ◄───────────┘   (Authorization: Bearer BOT_INGEST_SECRET)
 ```
 
-| Respuesta del destino  | Qué hace el bot                                            |
-| ---------------------- | ---------------------------------------------------------- |
-| 201 publicada          | Recuerda el post                                           |
-| 409 duplicada          | Recuerda el post                                           |
-| 422 no publicable      | Recuerda el post (no se reintenta)                         |
-| 429 límite del destino | Corta la corrida; el resto queda para la siguiente         |
-| 5xx / red              | Reintenta esa oferta en la próxima corrida                 |
-| 401 / 503              | Para y termina con error (secreto malo o endpoint apagado) |
+| Respuesta del destino  | Qué hace el bot                                                                                                                            |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| 201 publicada          | Recuerda el post                                                                                                                           |
+| 409 duplicada          | Recuerda el post                                                                                                                           |
+| 422 no publicable      | Lo reintenta en cada corrida mientras sea reciente, salvo si ya venció (`expired`): una tienda nueva o un arreglo puede hacerlo publicable |
+| 429 límite del destino | Corta la corrida; el resto queda para la siguiente                                                                                         |
+| 5xx / red              | Reintenta esa oferta en la próxima corrida                                                                                                 |
+| 401 / 503              | Para y termina con error (secreto malo o endpoint apagado)                                                                                 |
 
 ## Qué publica
 

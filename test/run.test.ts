@@ -59,8 +59,45 @@ describe("runOnce", () => {
       retry: 1,
       stopped: null,
     });
-    expect(seen.has(offer(4))).toBe(false);
-    expect([1, 2, 3].every((id) => seen.has(offer(id)))).toBe(true);
+    // published and duplicate are settled; a rejection and a failure are tried again
+    expect([1, 2].every((id) => seen.has(offer(id)))).toBe(true);
+    expect([3, 4].some((id) => seen.has(offer(id)))).toBe(false);
+  });
+
+  it("tries a rejected offer again on the next run, but never an ended one", async () => {
+    const seen = seenFile();
+    const rejected = (reason: string): IngestOutcome => ({ kind: "rejected", reason });
+    let answer: IngestOutcome = rejected("no_images");
+    const ingest = vi.fn(async () => answer);
+
+    await runOnce({ offers: [offer(1)], ingest, seen, now: () => NOW });
+    answer = { kind: "published", slug: "a" };
+    const second = await runOnce({ offers: [offer(1)], ingest, seen, now: () => NOW });
+    expect(ingest).toHaveBeenCalledTimes(2);
+    expect(second.published).toBe(1);
+
+    const ended = seenFile();
+    answer = rejected("expired");
+    await runOnce({ offers: [offer(2)], ingest, seen: ended, now: () => NOW });
+    const third = await runOnce({ offers: [offer(2)], ingest, seen: ended, now: () => NOW });
+    expect(ingest).toHaveBeenCalledTimes(3);
+    expect(third.skipped).toBe(1);
+  });
+
+  it("stops retrying a rejected offer once it is older than the window", async () => {
+    const ingest = vi.fn(async (): Promise<IngestOutcome> => ({
+      kind: "rejected",
+      reason: "bad_link",
+    }));
+    const old = offer(1, { publishedAt: new Date(NOW.getTime() - 121 * 60_000) });
+    await runOnce({
+      offers: [old],
+      ingest,
+      seen: seenFile(),
+      now: () => NOW,
+      maxAgeMs: 120 * 60_000,
+    });
+    expect(ingest).not.toHaveBeenCalled();
   });
 
   it("skips posts already seen and deals that already ended, without calling the destination site", async () => {
