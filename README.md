@@ -14,7 +14,7 @@ Estado: lee tres fuentes y publica en el sitio de destino. `npm run dry-run [fue
 ## Cómo funciona
 
 ```text
-GitHub Actions (cada 30 min)
+GitHub Actions (se encadena: una corrida cada 30 min)
   para cada fuente: leer su lista → quitar posts ya vistos o vencidos → enviar del más antiguo al más nuevo
                                                                       │
                          POST {TARGET_URL}/api/bot/ingest ◄───────────┘   (Authorization: Bearer BOT_INGEST_SECRET)
@@ -61,7 +61,14 @@ Agregar una fuente es crear un archivo en `src/sources` que cumpla `Source` (ver
 | `BOT_GAP_SECONDS`     | env (opcional)            | Espera tras cada oferta publicada (45)                         |
 | `ONLY_SOURCE`         | env (opcional)            | Corre una sola fuente, por su nombre en `src/sources`          |
 
-Puesta en marcha: Settings → Secrets and variables → Actions → definir `BOT_INGEST_SECRET`, `TARGET_URL` y `BOT_ENABLED=true`; luego Actions → run bot → Run workflow para probar.
+Puesta en marcha: Settings → Secrets and variables → Actions → definir `BOT_INGEST_SECRET`, `TARGET_URL` y `BOT_ENABLED=true`; luego Actions → run bot → Run workflow **una vez**: desde ahí sigue solo.
+
+### Cómo se mantiene corriendo
+
+El cron de GitHub no es fiable (en este repositorio disparó una sola vez en varias horas), así que el workflow **se encadena a sí mismo**: su último paso espera hasta que se cumplan 30 minutos desde que empezó y lanza la siguiente corrida con el token del propio trabajo. El cron (`7,37 * * * *`) queda solo como respaldo: si la cadena se rompe, la próxima ejecución programada que GitHub sí dispare la reinicia. Nunca hay dos corridas a la vez (`concurrency`), y si ya hay una esperando no se encola otra.
+
+- **Detenerlo:** poner `BOT_ENABLED` en otra cosa que `true`, o cancelar la corrida en curso (un cancelado no encadena la siguiente). Una corrida que falla sí encadena: una fuente rota no debe parar el bot.
+- **Reiniciarlo:** Actions → run bot → Run workflow. El campo `cycle_minutes` fija cuántos minutos pasan hasta la siguiente (30 por defecto).
 
 Cada corrida cuesta unos 2–3 minutos (instala Chromium). El repositorio es público, así que los minutos de Actions no tienen límite; en uno privado (2000 min/mes) habría que bajar la frecuencia. Los posts ya vistos viven en la caché de Actions (se pierden tras 7 días sin corridas; el destino rechaza los duplicados igual).
 

@@ -2,9 +2,16 @@ name: run bot
 
 on:
   schedule:
-    # Every 30 minutes. The repository is public, so Actions minutes are not limited.
-    - cron: "*/30 * * * *"
+    # Safety net only. GitHub drops or delays scheduled runs (here it fired once in several hours),
+    # so the bot chains itself: each run queues the next one at its last step. If the chain ever
+    # breaks, the next scheduled run that does fire starts it again. Odd minutes: the top of the
+    # hour and the half hour are when GitHub is busiest.
+    - cron: "7,37 * * * *"
   workflow_dispatch:
+    inputs:
+      cycle_minutes:
+        description: Minutes from the start of this run to the start of the next one
+        default: "30"
 
 # Two overlapping runs would read the same posts: the next one waits.
 concurrency:
@@ -17,10 +24,18 @@ permissions:
 jobs:
   run:
     # Off until the repository variable BOT_ENABLED is "true" (Settings → Secrets and variables → Actions).
+    # Setting it to anything else, or cancelling a run, also ends the chain.
     if: vars.BOT_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    permissions:
+      contents: read
+      # to queue the next run (workflow_dispatch made with the job's own token is allowed)
+      actions: write
     steps:
+      - name: Remember when this run started
+        run: echo "RUN_STARTED=$(date +%s)" >> "$GITHUB_ENV"
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
@@ -67,3 +82,27 @@ jobs:
         with:
           path: seen-posts.json
           key: seen-v2-${{ github.run_id }}
+
+      # The chain. It runs after a failed run too (a broken source must not stop the bot) but not
+      # after a cancelled one: cancelling is how to stop it.
+      - name: Queue the next run
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CYCLE_MINUTES: ${{ inputs.cycle_minutes || '30' }}
+        run: |
+          wait=$(( CYCLE_MINUTES * 60 - ( $(date +%s) - RUN_STARTED ) ))
+          if [ "$wait" -gt 0 ]; then
+            echo "Waiting ${wait}s to start the next run ${CYCLE_MINUTES} minutes after this one began."
+            sleep "$wait"
+          fi
+          # Another run already waiting (the safety-net schedule, or a manual one) is the next run.
+          waiting=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow run.yml --limit 20 \
+            --json databaseId,status \
+            --jq "[.[] | select(.databaseId != $GITHUB_RUN_ID and (.status == \"queued\" or .status == \"waiting\" or .status == \"pending\"))] | length")
+          if [ "$waiting" -gt 0 ]; then
+            echo "A run is already waiting: not queueing another."
+          else
+            gh workflow run run.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME"
+            echo "Queued the next run."
+          fi
