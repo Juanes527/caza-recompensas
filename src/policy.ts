@@ -5,11 +5,11 @@
  */
 export const DEFAULT_MAX_AGE_MINUTES = 120;
 /** Wait after each published offer. */
-export const DEFAULT_GAP_SECONDS = 45;
+export const DEFAULT_GAP_SECONDS = 120;
 /** Wait after an offer that was not published (duplicate, rejected). */
 export const POLITE_MS = 3_000;
 /** A run stops starting offers after this long, so it finishes before the next scheduled one. */
-export const RUN_BUDGET_MS = 25 * 60_000;
+export const RUN_BUDGET_MS = 50 * 60_000;
 
 export type Policy = { maxAgeMs: number; gapMs: number };
 

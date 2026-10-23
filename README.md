@@ -14,7 +14,7 @@ Estado: lee tres fuentes y publica en el sitio de destino. `npm run dry-run [fue
 ## Cómo funciona
 
 ```text
-GitHub Actions (se encadena: una corrida cada 30 min)
+GitHub Actions (se encadena: una corrida cada hora)
   para cada fuente: leer su lista → quitar posts ya vistos o vencidos → enviar del más antiguo al más nuevo
                                                                       │
                          POST {TARGET_URL}/api/bot/ingest ◄───────────┘   (Authorization: Bearer BOT_INGEST_SECRET)
@@ -35,10 +35,10 @@ El bot sigue a las comunidades, no copia sus páginas. **No hay tope de publicac
 
 1. Solo posts **recientes**: publicados hace menos de 120 minutos (`BOT_MAX_AGE_MINUTES`). Así la primera corrida no sube la portada entera.
 2. Se quitan los ya vistos y los que ya vencieron.
-3. Las ofertas de **todas las fuentes** entran en una sola cola, ordenadas de la más antigua a la más nueva, y se publican **una cada 45 segundos** (`BOT_GAP_SECONDS`). Tras un duplicado o un rechazo solo se espera 3 s, porque no se publicó nada.
-4. Una corrida deja de empezar ofertas a los 25 minutos para terminar antes de la siguiente; lo que quede espera a la corrida siguiente mientras siga dentro de la ventana de 120 minutos.
+3. Las ofertas de **todas las fuentes** entran en una sola cola, ordenadas de la más antigua a la más nueva, y se publican **una cada 2 minutos** (`BOT_GAP_SECONDS`). Tras un duplicado o un rechazo solo se espera 3 s, porque no se publicó nada.
+4. Una corrida deja de empezar ofertas a los 50 minutos para terminar antes de la siguiente; lo que quede espera a la corrida siguiente mientras siga dentro de la ventana de 120 minutos.
 
-Al ritmo de 45 s salen como máximo unas 80 ofertas por hora. `npm run dry-run` muestra exactamente qué se enviaría.
+Al ritmo de 2 min salen como máximo unas 25 ofertas por corrida. `npm run dry-run` muestra exactamente qué se enviaría.
 
 ## Fuentes
 
@@ -58,7 +58,7 @@ Agregar una fuente es crear un archivo en `src/sources` que cumpla `Source` (ver
 | `BOT_ENABLED`         | Variable de Actions       | `true` enciende el workflow; sin ella no corre                   |
 | `STATE_FILE`          | env (opcional)            | Dónde se guardan los posts ya vistos (`seen-posts.json`)         |
 | `BOT_MAX_AGE_MINUTES` | Variable de Actions       | Antigüedad máxima de un post (120)                               |
-| `BOT_GAP_SECONDS`     | Variable de Actions       | Espera tras cada oferta publicada (45)                           |
+| `BOT_GAP_SECONDS`     | Variable de Actions       | Espera tras cada oferta publicada (120)                          |
 | `BOT_CYCLE_MINUTES`   | Variable de Actions       | Minutos entre el inicio de una corrida y el de la siguiente (30) |
 | `ONLY_SOURCE`         | env (opcional)            | Corre una sola fuente, por su nombre en `src/sources`            |
 
@@ -66,7 +66,7 @@ Puesta en marcha: Settings → Secrets and variables → Actions → definir `BO
 
 ### Cómo se mantiene corriendo
 
-El cron de GitHub no es fiable (en este repositorio disparó una sola vez en varias horas), así que el workflow **se encadena a sí mismo**: su último paso espera hasta que se cumplan 30 minutos desde que empezó y lanza la siguiente corrida con el token del propio trabajo. El cron (`7,37 * * * *`) queda solo como respaldo: si la cadena se rompe, la próxima ejecución programada que GitHub sí dispare la reinicia. Nunca hay dos corridas a la vez (`concurrency`), y si ya hay una esperando no se encola otra.
+El cron de GitHub no es fiable (en este repositorio disparó una sola vez en varias horas), así que el workflow **se encadena a sí mismo**: su último paso espera hasta que se cumpla una hora desde que empezó y lanza la siguiente corrida con el token del propio trabajo. El cron (`7 * * * *`) queda solo como respaldo: si la cadena se rompe, la próxima ejecución programada que GitHub sí dispare la reinicia. Nunca hay dos corridas a la vez (`concurrency`), y si ya hay una esperando no se encola otra.
 
 - **Detenerlo:** poner `BOT_ENABLED` en otra cosa que `true`, o cancelar la corrida en curso (un cancelado no encadena la siguiente). Una corrida que falla sí encadena: una fuente rota no debe parar el bot.
 - **Reiniciarlo:** Actions → run bot → Run workflow. El campo `cycle_minutes` fija cuántos minutos pasan hasta la siguiente (30 por defecto).

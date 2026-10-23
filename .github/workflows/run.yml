@@ -6,12 +6,12 @@ on:
     # so the bot chains itself: each run queues the next one at its last step. If the chain ever
     # breaks, the next scheduled run that does fire starts it again. Odd minutes: the top of the
     # hour and the half hour are when GitHub is busiest.
-    - cron: "7,37 * * * *"
+    - cron: "7 * * * *"
   workflow_dispatch:
     inputs:
       cycle_minutes:
         description: Minutes from the start of this run to the start of the next one
-        default: "30"
+        default: "60"
 
 # Two overlapping runs would read the same posts: the next one waits.
 concurrency:
@@ -27,7 +27,7 @@ jobs:
     # Setting it to anything else, or cancelling a run, also ends the chain.
     if: vars.BOT_ENABLED == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 65
     permissions:
       contents: read
       # to queue the next run (workflow_dispatch made with the job's own token is allowed)
@@ -111,7 +111,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           # A manual run can set it for itself; the chained ones use the repository variable.
-          CYCLE_MINUTES: ${{ inputs.cycle_minutes || vars.BOT_CYCLE_MINUTES || '30' }}
+          CYCLE_MINUTES: ${{ inputs.cycle_minutes || vars.BOT_CYCLE_MINUTES || '60' }}
         run: |
           wait=$(( CYCLE_MINUTES * 60 - ( $(date +%s) - RUN_STARTED ) ))
           if [ "$wait" -gt 0 ]; then

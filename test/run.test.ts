@@ -244,7 +244,7 @@ describe("the queue", () => {
       ingest: async (o) => answers[Number(o.sourceId) - 1]!,
       seen: seenFile(),
       now: () => NOW,
-      gapMs: 45_000,
+      gapMs: 120_000,
       politeMs: 3_000,
       sleep: async (ms) => void waits.push(ms),
       ...extra,
@@ -288,15 +288,15 @@ describe("the queue", () => {
 });
 
 describe("policyFromEnv", () => {
-  it("defaults to the last two hours and 45 s between offers, and accepts overrides", () => {
-    expect(policyFromEnv({})).toEqual({ maxAgeMs: 120 * 60_000, gapMs: 45_000 });
+  it("defaults to the last two hours and 2 minutes between offers, and accepts overrides", () => {
+    expect(policyFromEnv({})).toEqual({ maxAgeMs: 120 * 60_000, gapMs: 120_000 });
     expect(policyFromEnv({ BOT_MAX_AGE_MINUTES: "30", BOT_GAP_SECONDS: "60" })).toEqual({
       maxAgeMs: 30 * 60_000,
       gapMs: 60_000,
     });
     expect(policyFromEnv({ BOT_MAX_AGE_MINUTES: "-5", BOT_GAP_SECONDS: "x" })).toEqual({
       maxAgeMs: 120 * 60_000,
-      gapMs: 45_000,
+      gapMs: 120_000,
     });
   });
 });
