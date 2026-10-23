@@ -244,7 +244,7 @@ describe("the queue", () => {
       ingest: async (o) => answers[Number(o.sourceId) - 1]!,
       seen: seenFile(),
       now: () => NOW,
-      gapMs: 120_000,
+      gapMs: 45_000,
       politeMs: 3_000,
       sleep: async (ms) => void waits.push(ms),
       ...extra,
