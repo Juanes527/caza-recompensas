@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { looksLikeErrorPage, resolveOrKeep } from "../src/links.ts";
+import { looksLikeErrorPage, resolveOrKeep, unwrapAwin } from "../src/links.ts";
 import { runOnce } from "../src/run.ts";
 import { SeenPosts } from "../src/state.ts";
 import type { SourceOffer } from "../src/types.ts";
@@ -47,6 +47,42 @@ describe("resolveOrKeep", () => {
       "https://www.ebay.com/n/error?statuscode=500": null,
     });
     expect(await resolveOrKeep("https://ebay.us/xyz")).toBe("https://ebay.us/xyz");
+  });
+
+  it("reads the product out of an Awin link without visiting Awin", async () => {
+    stubRedirects({
+      "https://www.adidas.co/tenis-de-running-treadmove/KI8355.html": null,
+    });
+    expect(
+      await resolveOrKeep(
+        "https://www.awin1.com/cread.php?awinmid=79924&awinaffid=3126875&clickref=DropOfertas&ued=https%3A%2F%2Fwww.adidas.co%2Ftenis-de-running-treadmove%2FKI8355.html",
+      ),
+    ).toBe("https://www.adidas.co/tenis-de-running-treadmove/KI8355.html");
+  });
+
+  it("keeps the product of an Awin link even when the store cannot be reached", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("network down");
+      }),
+    );
+    expect(
+      await resolveOrKeep(
+        "https://www.awin1.com/cread.php?awinmid=79924&awinaffid=1&ued=https%3A%2F%2Fwww.adidas.co%2FKI8355.html",
+      ),
+    ).toBe("https://www.adidas.co/KI8355.html");
+  });
+
+  it("leaves Awin links without a usable product alone", () => {
+    for (const link of [
+      "https://www.awin1.com/cread.php?awinmid=79924&awinaffid=1",
+      "https://www.awin1.com/cread.php?ued=javascript%3Aalert(1)",
+      "https://www.awin1.com/other.php?ued=https%3A%2F%2Fwww.adidas.co%2FKI8355.html",
+      "https://awin1.com.evil.example/cread.php?ued=https%3A%2F%2Fx.example",
+    ]) {
+      expect(unwrapAwin(link)).toBe(link);
+    }
   });
 
   it("keeps the original link when resolving fails", async () => {

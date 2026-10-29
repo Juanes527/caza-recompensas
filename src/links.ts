@@ -39,10 +39,27 @@ export function looksLikeErrorPage(link: string): boolean {
  * resolved here, where it works. When the store answers with an error page or the resolution
  * fails, the original link is kept: sending a link to an error page would publish a broken offer.
  */
-export async function resolveOrKeep(link: string): Promise<string> {
+export async function resolveOrKeep(raw: string): Promise<string> {
+  const link = unwrapAwin(raw);
   try {
     const resolved = await resolveStoreUrl(link);
     return looksLikeErrorPage(resolved) ? link : resolved;
+  } catch {
+    return link;
+  }
+}
+
+/**
+ * Awin deep links (www.awin1.com/cread.php?…&ued=<product>) carry the product link in `ued`.
+ * It is read from there instead of following the redirect: following it would record a click for
+ * the poster's Awin account, and when Awin does not answer the link would be left on awin1.com.
+ */
+export function unwrapAwin(link: string): string {
+  try {
+    const url = new URL(link);
+    if (!/(^|\.)awin1\.com$/i.test(url.hostname) || url.pathname !== "/cread.php") return link;
+    const product = url.searchParams.get("ued");
+    return product && /^https?:\/\//i.test(product) ? product : link;
   } catch {
     return link;
   }
